@@ -1,3 +1,5 @@
+import Link from "next/link"
+
 type CityGuide = {
   city: string
   source: string
@@ -17,22 +19,22 @@ const COUNTRY_CITY_GUIDES: CountryGuide[] = [
     country: "Australia",
     flag: "🇦🇺",
     theme: "from-sky-100 to-cyan-50",
-    summary: "Primary assignment market with public city and tourism portals.",
+    summary: "Experience the magic of Australia—a land of ancient stories, world-class festivals, and iconic landscapes that create memories to last a lifetime.",
     cities: [
       {
         city: "Sydney",
         source: "whatson.cityofsydney.nsw.gov.au",
-        extractionHint: "JSON-LD Event blocks + `/events/` card links",
+        extractionHint: "Experience the heartbeat of Australia’s global city, where the iconic Sydney Harbour transforms into a world-class stage for light, music, and creative ideas.",
       },
       {
         city: "Sydney",
         source: "sydney.com/events",
-        extractionHint: "Listing cards with title/time/location text nodes",
+        extractionHint: "From the dazzle of Vivid Sydney 2026 to the prestige of the TCS Sydney Marathon, discover an unforgettable calendar of sport, art, and celebration.",
       },
       {
         city: "Sydney",
         source: "iccsydney.com.au/whats-on",
-        extractionHint: "Venue event cards + structured metadata",
+        extractionHint: "Connect at the epicentre of innovation, hosting Australia’s premier business summits, tech expos, and industry-leading networking events.",
       },
     ],
   },
@@ -40,22 +42,22 @@ const COUNTRY_CITY_GUIDES: CountryGuide[] = [
     country: "United Kingdom",
     flag: "🇬🇧",
     theme: "from-rose-100 to-slate-50",
-    summary: "Cross-country expansion example using major-event signals.",
+    summary: "Discover the magic of the UK through a year-round journey of iconic festivals, cultural celebrations, and industry-leading events.",
     cities: [
       {
         city: "Aberdeen",
         source: "predicthq.com/major-events/cities/gb/aberdeen",
-        extractionHint: "Major-event cards + event detail links",
+        extractionHint: "Discover the Silver City by the sea, where centuries of maritime heritage blend with vibrant street art, spectacular coastal events, and global energy leadership.",
       },
       {
         city: "London",
         source: "eventbrite.com",
-        extractionHint: "Search listing cards filtered by city slug",
+        extractionHint: "Experience the world’s stage in London, where historic landmarks meet cutting-edge festivals, West End glamour, and premier global summits.",
       },
       {
         city: "Manchester",
         source: "eventbrite.com",
-        extractionHint: "Card extraction with date + CTA link pattern",
+        extractionHint: "Pulse with the energy of the UK’s cultural powerhouse, famous for its legendary music scene, world-class football, and the bold innovation of a city that never stops.",
       },
     ],
   },
@@ -63,22 +65,22 @@ const COUNTRY_CITY_GUIDES: CountryGuide[] = [
     country: "India",
     flag: "🇮🇳",
     theme: "from-amber-100 to-orange-50",
-    summary: "Scalable pattern: same parser strategy across city pages.",
+    summary: "Immerse yourself in Incredible India, a vibrant land where ancient traditions and colourful festivals create a symphony of unforgettable experiences.",
     cities: [
       {
         city: "Mumbai",
         source: "australia.com/events (calendar pattern example)",
-        extractionHint: "Structured event schema + card fallback selectors",
+        extractionHint: "The City of Dreams where Bollywood glamour meets global finance, hosting everything from star-studded premieres to the iconic Kala Ghoda Arts Festival.",
       },
       {
         city: "Bengaluru",
         source: "eventbrite.com",
-        extractionHint: "City-specific listing URL and `/e/` anchors",
+        extractionHint: "Step into India’s Silicon Valley, a high-energy hub for groundbreaking tech expos, vibrant music festivals, and a legendary craft beer and cafe culture.",
       },
       {
         city: "Delhi",
         source: "eventbrite.com",
-        extractionHint: "Time/location parsing from listing card text",
+        extractionHint: "A powerful blend of ancient history and modern governance, where grand Republic Day parades meet international trade fairs and a world-renowned culinary and arts scene.",
       },
     ],
   },
@@ -88,9 +90,9 @@ export default function CountryCityGuide() {
   return (
     <section className="space-y-4">
       <div className="space-y-1">
-        <h2 className="text-2xl font-semibold">Scraping Coverage Blueprint</h2>
+        <h2 className="text-2xl font-semibold">Country And City</h2>
         <p className="text-sm text-gray-600">
-          Hover a country card to inspect popular cities and the data extraction pattern.
+          Select city, To open in Dashboard.
         </p>
       </div>
 
@@ -98,7 +100,7 @@ export default function CountryCityGuide() {
         {COUNTRY_CITY_GUIDES.map((item) => (
           <article
             key={item.country}
-            className="group rounded-2xl border bg-white/80 backdrop-blur-sm p-4 shadow-sm transition hover:shadow-md"
+            className="rounded-2xl border bg-white/80 backdrop-blur-sm p-4 shadow-sm transition hover:shadow-md"
           >
             <div className={`rounded-xl bg-gradient-to-br ${item.theme} p-3`}>
               <div className="flex items-center gap-3">
@@ -110,17 +112,17 @@ export default function CountryCityGuide() {
               </div>
             </div>
 
-            <div className="mt-2 text-xs text-gray-500 hidden md:block">
-              Hover to reveal cities + extraction hints
-            </div>
-
-            <div className="mt-4 space-y-3 overflow-hidden max-h-96 md:max-h-0 md:group-hover:max-h-96 transition-all duration-300">
+            <div className="mt-4 space-y-3">
               {item.cities.map((city) => (
-                <div key={`${item.country}-${city.city}`} className="rounded-lg border p-3 bg-gray-50">
+                <Link
+                  key={`${item.country}-${city.city}-${city.source}`}
+                  href={`/dashboard?city=${encodeURIComponent(city.city)}`}
+                  className="block rounded-lg border p-3 bg-gray-50 hover:bg-gray-100 transition"
+                >
                   <div className="text-sm font-medium">{city.city}</div>
                   <div className="text-xs text-gray-600">{city.source}</div>
                   <div className="text-xs text-gray-500 mt-1">{city.extractionHint}</div>
-                </div>
+                </Link>
               ))}
             </div>
           </article>

@@ -12,17 +12,22 @@ export async function POST(request: Request) {
 
   await connectToDatabase()
   let sourceNames: string[] | undefined
+  let city: string | undefined
 
   try {
-    const body = (await request.json()) as { sources?: unknown }
+    const body = (await request.json()) as { sources?: unknown; city?: unknown }
     if (Array.isArray(body.sources)) {
       sourceNames = body.sources.filter((value): value is string => typeof value === "string")
     }
+    if (typeof body.city === "string" && body.city.trim()) {
+      city = body.city.trim()
+    }
   } catch {
     sourceNames = undefined
+    city = undefined
   }
 
-  const result = await runScrapePipeline(sourceNames)
+  const result = await runScrapePipeline(sourceNames, city)
 
   return NextResponse.json(result)
 }

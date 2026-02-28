@@ -1,6 +1,7 @@
 import { chromium } from "playwright"
 import Event, { EventStatusTag } from "@/models/Event"
 import { ALL_SCRAPER_SOURCES, SCRAPER_SOURCES } from "@/services/scraper/sources"
+import { createEventbriteSourceForCity } from "@/services/scraper/sources/eventbrite"
 import {
   ScrapedEventInput,
   ScrapePipelineResult,
@@ -236,21 +237,39 @@ const persistScrapedEvents = async (
   }
 }
 
-const resolveSources = (sourceNames?: string[]) => {
+const resolveSources = (sourceNames?: string[], city?: string) => {
   if (!sourceNames) {
+    if (city?.trim()) {
+      return SCRAPER_SOURCES.map((source) =>
+        source.sourceName === "eventbrite"
+          ? createEventbriteSourceForCity(city)
+          : source
+      )
+    }
     return SCRAPER_SOURCES
   }
 
   const requested = new Set(sourceNames.map((name) => name.toLowerCase()))
-  return ALL_SCRAPER_SOURCES.filter((source) =>
+  const selected = ALL_SCRAPER_SOURCES.filter((source) =>
     requested.has(source.sourceName.toLowerCase())
+  )
+
+  if (!city?.trim()) {
+    return selected
+  }
+
+  return selected.map((source) =>
+    source.sourceName === "eventbrite"
+      ? createEventbriteSourceForCity(city)
+      : source
   )
 }
 
 export const runScrapePipeline = async (
-  sourceNames?: string[]
+  sourceNames?: string[],
+  city?: string
 ): Promise<ScrapePipelineResult> => {
-  const selectedSources = resolveSources(sourceNames)
+  const selectedSources = resolveSources(sourceNames, city)
   const { events, sourceResults, successfulSourceNames } = await gatherEventsFromSources(
     selectedSources
   )

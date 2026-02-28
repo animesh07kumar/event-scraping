@@ -4,6 +4,28 @@ import Event, { EventStatusTag } from "@/models/Event"
 
 const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
 
+const parseFromDate = (value: string) => {
+  const fromDate = new Date(value)
+  if (Number.isNaN(fromDate.getTime())) return null
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    fromDate.setHours(0, 0, 0, 0)
+  }
+
+  return fromDate
+}
+
+const parseToDate = (value: string) => {
+  const toDate = new Date(value)
+  if (Number.isNaN(toDate.getTime())) return null
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    toDate.setHours(23, 59, 59, 999)
+  }
+
+  return toDate
+}
+
 export async function GET(request: NextRequest) {
   await connectToDatabase()
 
@@ -44,15 +66,15 @@ export async function GET(request: NextRequest) {
     filters.dateTime = {}
 
     if (from) {
-      const fromDate = new Date(from)
-      if (!Number.isNaN(fromDate.getTime())) {
+      const fromDate = parseFromDate(from)
+      if (fromDate) {
         ;(filters.dateTime as Record<string, Date>).$gte = fromDate
       }
     }
 
     if (to) {
-      const toDate = new Date(to)
-      if (!Number.isNaN(toDate.getTime())) {
+      const toDate = parseToDate(to)
+      if (toDate) {
         ;(filters.dateTime as Record<string, Date>).$lte = toDate
       }
     }
@@ -62,9 +84,14 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const [events, total] = await Promise.all([
+  const cityFilter = {
+    city: new RegExp(`^${escapeRegExp(city)}$`, "i"),
+  }
+
+  const [events, total, cityLastScraped] = await Promise.all([
     Event.find(filters).sort({ dateTime: 1 }).skip(skip).limit(limit).lean(),
     Event.countDocuments(filters),
+    Event.findOne(cityFilter).sort({ lastScrapedAt: -1 }).select("lastScrapedAt").lean(),
   ])
 
   const normalizedEvents = events.map((event) => ({
@@ -85,5 +112,10 @@ export async function GET(request: NextRequest) {
     total,
     page,
     limit,
+    meta: {
+      cityLastScrapedAt: cityLastScraped?.lastScrapedAt
+        ? new Date(cityLastScraped.lastScrapedAt).toISOString()
+        : null,
+    },
   })
 }

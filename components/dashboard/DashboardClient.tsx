@@ -26,8 +26,6 @@ type DashboardEvent = {
   originalUrl: string
   statusTags: string[]
   imported: boolean
-  importedAt?: string | null
-  importedBy?: string
 }
 
 type ScrapeSummary = {
@@ -42,6 +40,19 @@ type ScrapeSummary = {
   inactivated: number
 }
 
+type EventsApiResponse = {
+  events: DashboardEvent[]
+  total: number
+  page: number
+  limit: number
+  meta?: {
+    cityLastScrapedAt?: string | null
+  }
+  error?: string
+}
+
+const ONE_HOUR_MS = 60 * 60 * 1000
+
 const SOURCE_OPTIONS = [
   "cityofsydney",
   "sydney-com",
@@ -51,9 +62,10 @@ const SOURCE_OPTIONS = [
   "predicthq-aberdeen",
 ]
 
-const DEFAULT_SOURCE_OPTIONS = SOURCE_OPTIONS.filter(
-  (source) => source !== "predicthq-aberdeen"
-)
+const CITY_SOURCE_MAP: Record<string, string[]> = {
+  sydney: ["cityofsydney", "sydney-com", "australia-com", "icc-sydney", "eventbrite"],
+  aberdeen: ["predicthq-aberdeen"],
+}
 
 const formatDateTime = (value: string | null | undefined) => {
   if (!value) return "TBA"
@@ -69,15 +81,26 @@ const formatDateTime = (value: string | null | undefined) => {
   })
 }
 
-type DashboardClientProps = {
-  defaultCity: string
+const getRecommendedSources = (cityValue: string) => {
+  const key = cityValue.trim().toLowerCase()
+  return CITY_SOURCE_MAP[key] ?? ["eventbrite"]
 }
 
-export default function DashboardClient({ defaultCity }: DashboardClientProps) {
-  const [city, setCity] = useState(defaultCity)
+type DashboardClientProps = {
+  defaultCity: string
+  defaultDateFrom?: string
+  defaultDateTo?: string
+}
+
+export default function DashboardClient({
+  defaultCity,
+  defaultDateFrom = "",
+  defaultDateTo = "",
+}: DashboardClientProps) {
+  const [city, setCity] = useState(defaultCity || "Sydney")
   const [query, setQuery] = useState("")
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
+  const [dateFrom, setDateFrom] = useState(defaultDateFrom)
+  const [dateTo, setDateTo] = useState(defaultDateTo)
   const [status, setStatus] = useState("all")
   const [events, setEvents] = useState<DashboardEvent[]>([])
   const [selectedId, setSelectedId] = useState("")
@@ -87,7 +110,18 @@ export default function DashboardClient({ defaultCity }: DashboardClientProps) {
   const [importLoadingId, setImportLoadingId] = useState("")
   const [scrapeLoading, setScrapeLoading] = useState(false)
   const [scrapeSummary, setScrapeSummary] = useState<ScrapeSummary | null>(null)
-  const [selectedSources, setSelectedSources] = useState<string[]>(DEFAULT_SOURCE_OPTIONS)
+  const [selectedSources, setSelectedSources] = useState<string[]>(
+    getRecommendedSources(defaultCity || "Sydney")
+  )
+  const [cityLastScrapedAt, setCityLastScrapedAt] = useState<string | null>(null)
+  const [showStaleScrapePrompt, setShowStaleScrapePrompt] = useState(false)
+
+  useEffect(() => {
+    setCity(defaultCity || "Sydney")
+    setDateFrom(defaultDateFrom || "")
+    setDateTo(defaultDateTo || "")
+    setSelectedSources(getRecommendedSources(defaultCity || "Sydney"))
+  }, [defaultCity, defaultDateFrom, defaultDateTo])
 
   const selectedEvent = useMemo(
     () => events.find((event) => event._id === selectedId) ?? null,
@@ -109,20 +143,36 @@ export default function DashboardClient({ defaultCity }: DashboardClientProps) {
       params.set("limit", "100")
 
       const response = await fetch(`/api/events?${params.toString()}`)
-      const data = await response.json()
+      const data = (await response.json()) as EventsApiResponse
 
       if (!response.ok) {
         setError(data.error ?? "Failed to load events")
         setEvents([])
+        setShowStaleScrapePrompt(false)
         return
       }
 
-      const nextEvents = (data.events ?? []) as DashboardEvent[]
+      const nextEvents = data.events ?? []
+      const lastScraped = data.meta?.cityLastScrapedAt ?? null
+      setCityLastScrapedAt(lastScraped)
       setEvents(nextEvents)
       setSelectedId((current) => current || nextEvents[0]?._id || "")
+
+      if (nextEvents.length === 0) {
+        const lastTime = lastScraped ? new Date(lastScraped).getTime() : null
+        const isFreshEnough =
+          typeof lastTime === "number" &&
+          !Number.isNaN(lastTime) &&
+          Date.now() - lastTime <= ONE_HOUR_MS
+
+        setShowStaleScrapePrompt(!isFreshEnough)
+      } else {
+        setShowStaleScrapePrompt(false)
+      }
     } catch {
       setError("Failed to load events")
       setEvents([])
+      setShowStaleScrapePrompt(false)
     } finally {
       setLoading(false)
     }
@@ -139,6 +189,7 @@ export default function DashboardClient({ defaultCity }: DashboardClientProps) {
 
   const importEvent = async (eventId: string) => {
     setImportLoadingId(eventId)
+    setError("")
 
     try {
       const response = await fetch(`/api/events/${eventId}/import`, {
@@ -162,8 +213,10 @@ export default function DashboardClient({ defaultCity }: DashboardClientProps) {
     }
   }
 
-  const runScrape = async () => {
-    if (selectedSources.length === 0) {
+  const runScrape = async (sourcesOverride?: string[]) => {
+    const sources = sourcesOverride ?? selectedSources
+
+    if (sources.length === 0) {
       setError("Select at least one source before running scrape.")
       return
     }
@@ -175,7 +228,7 @@ export default function DashboardClient({ defaultCity }: DashboardClientProps) {
       const response = await fetch("/api/scrape", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sources: selectedSources }),
+        body: JSON.stringify({ sources, city }),
       })
       const data = await response.json()
 
@@ -197,7 +250,7 @@ export default function DashboardClient({ defaultCity }: DashboardClientProps) {
     <main className="max-w-7xl mx-auto py-8 px-4 space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-bold">Event Dashboard</h1>
-        <Button onClick={runScrape} disabled={scrapeLoading}>
+        <Button onClick={() => void runScrape()} disabled={scrapeLoading}>
           {scrapeLoading ? "Scraping..." : "Run Scrape"}
         </Button>
       </div>
@@ -235,20 +288,18 @@ export default function DashboardClient({ defaultCity }: DashboardClientProps) {
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold">Scraper Sources</h2>
           <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => setSelectedSources(SOURCE_OPTIONS)}
-            >
+            <Button type="button" size="sm" variant="outline" onClick={() => setSelectedSources(SOURCE_OPTIONS)}>
               Select All
             </Button>
             <Button
               type="button"
               size="sm"
               variant="outline"
-              onClick={() => setSelectedSources([])}
+              onClick={() => setSelectedSources(getRecommendedSources(city))}
             >
+              City Default
+            </Button>
+            <Button type="button" size="sm" variant="outline" onClick={() => setSelectedSources([])}>
               Clear
             </Button>
           </div>
@@ -280,6 +331,22 @@ export default function DashboardClient({ defaultCity }: DashboardClientProps) {
         </div>
       </section>
 
+      {showStaleScrapePrompt && (
+        <section className="border rounded-md p-4 bg-amber-50 text-sm space-y-2">
+          <p className="text-amber-900">
+            No events matched city/date filters and this city was not scraped in the last hour.
+            Scrape latest data now.
+          </p>
+          <Button
+            size="sm"
+            onClick={() => void runScrape(getRecommendedSources(city))}
+            disabled={scrapeLoading}
+          >
+            Scrape Latest For {city || "Selected City"}
+          </Button>
+        </section>
+      )}
+
       {scrapeSummary && (
         <section className="border rounded-md p-4 bg-gray-50 text-sm space-y-2">
           <p>
@@ -287,6 +354,11 @@ export default function DashboardClient({ defaultCity }: DashboardClientProps) {
             {scrapeSummary.updated}, unchanged {scrapeSummary.unchanged}, inactivated{" "}
             {scrapeSummary.inactivated}
           </p>
+          {cityLastScrapedAt && (
+            <p className="text-xs text-gray-600">
+              Last scrape for {city}: {formatDateTime(cityLastScrapedAt)}
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             {scrapeSummary.sourceResults.map((result) => (
               <span key={result.sourceName} className="border rounded-md px-2 py-1 bg-white">
@@ -304,6 +376,10 @@ export default function DashboardClient({ defaultCity }: DashboardClientProps) {
         <div className="border rounded-lg overflow-hidden bg-white">
           {loading ? (
             <p className="p-4 text-sm text-gray-600">Loading events...</p>
+          ) : events.length === 0 ? (
+            <p className="p-4 text-sm text-gray-600">
+              No events found for selected filters. Try adjusting date range or scrape latest.
+            </p>
           ) : (
             <Table>
               <TableHeader>
