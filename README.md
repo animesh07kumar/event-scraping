@@ -1,4 +1,4 @@
-# Event Scraping Assignment (Sydney)
+# Event Scraping
 
 This project implements the mandatory assignment requirements:
 
@@ -85,11 +85,3 @@ Content-Type: application/json
    - `inactive` when missing from source or expired
    - `imported` when imported from dashboard
 
-## Verification
-
-```bash
-npm run lint
-npm run build
-```
-
-Both commands pass on this codebase.
