@@ -128,7 +128,7 @@ export default async function HomePage() {
           <section className="space-y-3">
             <h1 className="text-4xl font-bold">Today&apos;s Events</h1>
             <p className="text-gray-600 text-lg">
-              Showing up today's event, grouped by city.
+              Showing up today&apos;s event, grouped by city.
             </p>
           </section>
           {groups.map((group) => (

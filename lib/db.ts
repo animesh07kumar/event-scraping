@@ -1,4 +1,5 @@
 import mongoose, { Mongoose } from "mongoose"
+import { DB_NAME } from "@/constants/constants"
 
 const MONGODB_URI = process.env.MONGODB_URI!
 
@@ -31,6 +32,7 @@ export async function connectToDatabase() {
     const opts = {
       bufferCommands: false,
       maxPoolSize: 10,
+      dbName: DB_NAME,
     }
 
     cached!.promise = mongoose.connect(MONGODB_URI, opts)
