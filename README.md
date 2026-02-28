@@ -62,6 +62,12 @@ API:
 - `POST /api/scrape` (manual scrape, authenticated)
 - `POST /api/cron/scrape` (scheduled scrape, `x-cron-secret` required)
 
+## Vercel Notes
+
+- Deploy this project with root directory set to `event-scraping` (not repository root).
+- Scraping routes run in Node.js runtime and can take longer than standard API routes.
+- Some providers may block datacenter IP ranges (Vercel). If a source shows anti-bot errors in scrape summary, use a proxy provider or move scraper execution to a dedicated worker/VM.
+
 To scrape selected sources only:
 
 ```http
@@ -84,4 +90,3 @@ Content-Type: application/json
    - `updated` when content changes
    - `inactive` when missing from source or expired
    - `imported` when imported from dashboard
-

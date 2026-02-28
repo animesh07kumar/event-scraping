@@ -20,6 +20,27 @@ type GatheredEvents = {
   successfulSourceNames: string[]
 }
 
+const createBrowserLaunchOptions = () => {
+  const isVercel = process.env.VERCEL === "1"
+
+  if (!isVercel) {
+    return { headless: true as const }
+  }
+
+  return {
+    headless: true as const,
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--disable-features=site-per-process",
+      "--single-process",
+      "--no-zygote",
+    ],
+  }
+}
+
 const mergeStatusTags = (
   previous: EventStatusTag[],
   {
@@ -61,7 +82,7 @@ const gatherEventsFromSources = async (
   const successfulSourceNames: string[] = []
   const allEvents: ScrapedEventInput[] = []
 
-  const browser = await chromium.launch({ headless: true })
+  const browser = await chromium.launch(createBrowserLaunchOptions())
   const context = await browser.newContext({
     userAgent:
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
